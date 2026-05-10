@@ -42,7 +42,7 @@ class ErrorCode(Enum):
     FILE_SYSTEM_ERROR = 5004
     NETWORK_ERROR = 5005
 
-    # 通用错误 (9000-9999)
+ 
     UNKNOWN_ERROR = 9001
     VALIDATION_ERROR = 9002
     TIMEOUT_ERROR = 9003
@@ -50,7 +50,7 @@ class ErrorCode(Enum):
 
 
 class BaseProductionException(Exception):
-    """生产级异常基类"""
+  
 
     def __init__(
         self,
@@ -72,7 +72,7 @@ class BaseProductionException(Exception):
         super().__init__(self.message)
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
+        
         return {
             'error_code': self.error_code.value,
             'error_name': self.error_code.name,
@@ -90,7 +90,7 @@ class BaseProductionException(Exception):
 
 
 class DataIngestionException(BaseProductionException):
-    """数据摄取异常"""
+
 
     def __init__(
         self,
@@ -110,7 +110,7 @@ class DataIngestionException(BaseProductionException):
 
 
 class DataValidationException(BaseProductionException):
-    """数据验证异常"""
+  
 
     def __init__(
         self,
@@ -130,7 +130,7 @@ class DataValidationException(BaseProductionException):
 
 
 class DataTransformationException(BaseProductionException):
-    """数据转换异常"""
+  
 
     def __init__(
         self,
@@ -150,7 +150,7 @@ class DataTransformationException(BaseProductionException):
 
 
 class ModelTrainingException(BaseProductionException):
-    """模型训练异常"""
+   
 
     def __init__(
         self,
@@ -170,7 +170,7 @@ class ModelTrainingException(BaseProductionException):
 
 
 class ModelNotFoundException(BaseProductionException):
-    """模型未找到异常"""
+   
 
     def __init__(
         self,
@@ -190,8 +190,7 @@ class ModelNotFoundException(BaseProductionException):
 
 
 class ModelPredictionException(BaseProductionException):
-    """模型预测异常"""
-
+ 
     def __init__(
         self,
         message: str,
@@ -210,8 +209,7 @@ class ModelPredictionException(BaseProductionException):
 
 
 class ConfigurationException(BaseProductionException):
-    """配置异常"""
-
+   
     def __init__(
         self,
         message: str,
@@ -234,7 +232,7 @@ class ConfigurationException(BaseProductionException):
 
 
 class APIException(BaseProductionException):
-    """API异常"""
+    
 
     def __init__(
         self,
@@ -257,7 +255,7 @@ class APIException(BaseProductionException):
 
 
 class RateLimitException(APIException):
-    """速率限制异常"""
+
 
     def __init__(
         self,
@@ -284,7 +282,7 @@ def retry_with_backoff(
     jitter: bool = True,
     exceptions: Tuple[Type[Exception], ...] = (Exception,)
 ) -> Callable:
-    """带退避策略的重试装饰器"""
+    
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -324,7 +322,7 @@ def circuit_breaker(
     recovery_timeout: float = 60.0,
     expected_exception: Type[Exception] = Exception
 ) -> Callable:
-    """断路器装饰器"""
+    
 
     def decorator(func: Callable) -> Callable:
         failure_count = 0
@@ -380,7 +378,7 @@ def handle_exceptions(
     log_traceback: bool = True,
     custom_handler: Optional[Callable[[Exception], Any]] = None
 ) -> Callable:
-    """通用异常处理装饰器"""
+    
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -406,7 +404,7 @@ def handle_exceptions(
 
 
 class ExceptionHandler:
-    """异常处理器"""
+   
 
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger or logging.getLogger(__name__)
@@ -418,7 +416,7 @@ class ExceptionHandler:
         exception: Exception,
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """处理异常并返回标准化的错误响应"""
+        
 
         if isinstance(exception, BaseProductionException):
             error_response = exception.to_dict()
@@ -441,13 +439,13 @@ class ExceptionHandler:
         return error_response
 
     def _record_error(self, error: Dict[str, Any]) -> None:
-        """记录错误历史"""
+        "
         self.error_history.append(error)
         if len(self.error_history) > self.max_history_size:
             self.error_history = self.error_history[-self.max_history_size:]
 
     def get_error_summary(self) -> Dict[str, Any]:
-        """获取错误摘要"""
+      
         if not self.error_history:
             return {'total_errors': 0, 'error_types': {}}
 
