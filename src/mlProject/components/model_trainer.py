@@ -1,6 +1,6 @@
 """
 Production Model Trainer with MLflow Integration
-生产级模型训练器 - 集成MLflow
+
 """
 
 import os
@@ -30,14 +30,7 @@ class ProductionModelTrainer:
         experiment_name: str = "wine-quality-prediction",
         tracking_uri: Optional[str] = None
     ):
-        """
-        初始化生产级模型训练器
-
-        Args:
-            config: 模型训练配置
-            experiment_name: MLflow实验名称
-            tracking_uri: MLflow追踪服务器URI
-        """
+        
         self.config = config
         self.experiment_name = experiment_name
         self.tracking_uri = tracking_uri or os.environ.get(
@@ -49,7 +42,7 @@ class ProductionModelTrainer:
         self.metrics = {}
 
     def _setup_mlflow(self) -> None:
-        """设置MLflow追踪"""
+       
         mlflow.set_tracking_uri(self.tracking_uri)
         mlflow.set_experiment(self.experiment_name)
         logger.info(f"MLflow已配置: {self.tracking_uri}")
@@ -61,17 +54,7 @@ class ProductionModelTrainer:
         run_name: Optional[str] = None,
         enable_logging: bool = True
     ) -> Dict[str, Any]:
-        """
-        训练模型并记录到MLflow
-
-        Args:
-            hyperparameters: 覆盖默认超参数
-            run_name: MLflow运行名称
-            enable_logging: 是否启用MLflow日志
-
-        Returns:
-            训练结果字典
-        """
+      
         try:
             train_data = pd.read_csv(self.config.train_data_path)
             test_data = pd.read_csv(self.config.test_data_path)
@@ -91,9 +74,9 @@ class ProductionModelTrainer:
                 return self._train_without_mlflow(train_x, train_y, params)
 
         except Exception as e:
-            logger.error(f"模型训练失败: {str(e)}")
+            logger.error(f": {str(e)}")
             raise ModelTrainingException(
-                message=f"模型训练失败: {str(e)}",
+                message=f": {str(e)}",
                 cause=e
             )
 
@@ -101,7 +84,7 @@ class ProductionModelTrainer:
         self,
         overrides: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """获取超参数配置"""
+       
         params = {
             "alpha": self.config.alpha,
             "l1_ratio": self.config.l1_ratio,
@@ -129,7 +112,7 @@ class ProductionModelTrainer:
 
         with mlflow.start_run(run_name=run_name or f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}") as run:
             self.run_id = run.info.run_id
-            logger.info(f"MLflow运行ID: {self.run_id}")
+            logger.info(f": {self.run_id}")
 
             mlflow.log_params(params)
 
@@ -141,7 +124,7 @@ class ProductionModelTrainer:
 
             self.model = self._create_model(params)
 
-            logger.info("开始训练模型...")
+            logger.info("")
             start_time = datetime.now()
 
             self.model.fit(train_x, train_y)
@@ -183,7 +166,7 @@ class ProductionModelTrainer:
         train_y: pd.DataFrame,
         params: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """不使用MLflow进行训练"""
+      
         self.model = self._create_model(params)
         self.model.fit(train_x, train_y)
         self._save_model()
@@ -194,7 +177,7 @@ class ProductionModelTrainer:
         }
 
     def _create_model(self, params: Dict[str, Any]):
-        """创建模型实例"""
+       
         from sklearn.linear_model import ElasticNet
         return ElasticNet(**params)
 
@@ -203,7 +186,7 @@ class ProductionModelTrainer:
         y_true: pd.DataFrame,
         y_pred: np.ndarray
     ) -> Dict[str, float]:
-        """计算评估指标"""
+      
         from sklearn.metrics import (
             mean_squared_error,
             mean_absolute_error,
@@ -221,7 +204,7 @@ class ProductionModelTrainer:
         }
 
     def _save_model(self) -> str:
-        """保存模型到磁盘"""
+     
         os.makedirs(self.config.root_dir, exist_ok=True)
         model_path = os.path.join(self.config.root_dir, self.config.model_name)
         joblib.dump(self.model, model_path)
@@ -229,7 +212,7 @@ class ProductionModelTrainer:
         return model_path
 
     def load_model(self) -> Any:
-        """加载模型"""
+      
         model_path = os.path.join(self.config.root_dir, self.config.model_name)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"模型文件不存在: {model_path}")
@@ -237,7 +220,7 @@ class ProductionModelTrainer:
         return self.model
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """使用模型进行预测"""
+      
         if self.model is None:
             self.load_model()
         return self.model.predict(X)
@@ -248,17 +231,7 @@ class ProductionModelTrainer:
         stage: str = "Staging",
         description: str = ""
     ) -> Dict[str, Any]:
-        """
-        注册模型到MLflow模型注册表
-
-        Args:
-            model_name: 模型名称
-            stage: 阶段 (Staging, Production, Archived)
-            description: 模型描述
-
-        Returns:
-            注册结果
-        """
+       
         client = MlflowClient(tracking_uri=self.tracking_uri)
 
         try:
@@ -287,22 +260,15 @@ class ProductionModelTrainer:
             }
 
         except Exception as e:
-            logger.error(f"模型注册失败: {str(e)}")
+            logger.error(f": {str(e)}")
             raise ModelTrainingException(
-                message=f"模型注册失败: {str(e)}",
+                message=f": {str(e)}",
                 cause=e
             )
 
     def compare_runs(self, metric: str = "rmse") -> pd.DataFrame:
-        """
-        比较实验运行
-
-        Args:
-            metric: 比较的指标名称
-
-        Returns:
-            比较结果DataFrame
-        """
+      
+  
         client = MlflowClient(tracking_uri=self.tracking_uri)
 
         experiment = mlflow.get_experiment_by_name(self.experiment_name)
@@ -330,8 +296,7 @@ class ProductionModelTrainer:
 
 
 class ModelRegistry:
-    """模型注册表管理器"""
-
+ 
     def __init__(self, tracking_uri: Optional[str] = None):
         self.tracking_uri = tracking_uri or os.environ.get(
             "MLFLOW_TRACKING_URI",
@@ -344,7 +309,7 @@ class ModelRegistry:
         name: str,
         stage: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """获取最新模型"""
+       
         try:
             if stage:
                 model = self.client.get_latest_model_versions(name, stages=[stage])
@@ -370,13 +335,13 @@ class ModelRegistry:
             return None
 
     def load_production_model(self, name: str) -> Any:
-        """加载生产模型"""
+       
         import tempfile
         import shutil
 
         latest = self.get_latest_model(name, stage="Production")
         if not latest:
-            raise ValueError(f"没有找到生产模型: {name}")
+            raise ValueError(f": {name}")
 
         local_dir = tempfile.mkdtemp()
         model_path = self.client.download_artifacts(
@@ -391,7 +356,7 @@ class ModelRegistry:
         return model
 
     def list_models(self) -> List[Dict[str, Any]]:
-        """列出所有注册模型"""
+        
         models = self.client.search_registered_models()
         return [
             {
