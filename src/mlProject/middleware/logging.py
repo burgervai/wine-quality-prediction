@@ -1,7 +1,4 @@
-"""
-Logging and Request Logging Middleware
-日志和请求日志中间件
-"""
+
 
 import time
 import uuid
@@ -19,8 +16,7 @@ import hashlib
 
 
 class StructuredLogger:
-    """结构化日志记录器"""
-
+    
     def __init__(
         self,
         name: str = "ml_pipeline",
@@ -53,7 +49,7 @@ class StructuredLogger:
             self.logger.addHandler(console_handler)
 
     def _format_extra(self, extra: Dict[str, Any]) -> str:
-        """格式化额外信息"""
+   
         if not extra:
             return ""
         return f" | {json.dumps(extra, default=str)}"
@@ -65,7 +61,7 @@ class StructuredLogger:
         request_id: Optional[str] = None,
         **kwargs
     ):
-        """通用日志方法"""
+      
         extra = kwargs.pop('extra', {})
         extra['request_id'] = request_id or 'no-request'
 
@@ -100,7 +96,7 @@ class StructuredLogger:
         response_size: int = 0,
         extra: Optional[Dict[str, Any]] = None
     ):
-        """记录HTTP请求"""
+      
         log_data = {
             "method": method,
             "path": path,
@@ -143,7 +139,7 @@ class StructuredLogger:
         status: str = "success",
         error: Optional[str] = None
     ):
-        """记录预测日志"""
+       
         log_data = {
             "prediction": prediction,
             "model_version": model_version,
@@ -173,7 +169,7 @@ class StructuredLogger:
         metrics: Optional[Dict[str, float]] = None,
         request_id: Optional[str] = None
     ):
-        """记录训练日志"""
+       
         log_data = {
             "run_id": run_id,
             "status": status,
@@ -196,7 +192,7 @@ class StructuredLogger:
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """请求日志中间件"""
+ 
 
     def __init__(
         self,
@@ -215,29 +211,29 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         ]
 
     def _should_log(self, path: str) -> bool:
-        """检查是否应该记录此请求"""
+   
         for exclude in self.exclude_paths:
             if path.startswith(exclude):
                 return False
         return True
 
     def _get_client_ip(self, request: Request) -> str:
-        """获取客户端IP"""
+
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     def _generate_request_id(self) -> str:
-        """生成请求ID"""
+        
         return str(uuid.uuid4())[:16]
 
     def _hash_features(self, data: bytes) -> str:
-        """哈希特征数据"""
+        
         return hashlib.md5(data).hexdigest()[:16]
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        """处理请求"""
+       
         request_id = request.headers.get("X-Request-ID") or self._generate_request_id()
         request.state.request_id = request_id
 
@@ -289,14 +285,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """应用日志中间件"""
-
+   
     def __init__(self, app):
         super().__init__(app)
         self.logger = logging.getLogger("ml_pipeline.middleware")
 
     async def dispatch(self, request: Request, call_next):
-        """处理请求"""
+       
         start_time = time.time()
 
         self.logger.debug(f"Request started: {request.method} {request.url.path}")
@@ -313,7 +308,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 
 class AuditLogger:
-    """审计日志记录器"""
+    
 
     def __init__(self, log_dir: str = "logs"):
         self.audit_path = Path(log_dir) / "audit"
@@ -328,7 +323,7 @@ class AuditLogger:
             log_file.touch()
 
     def _rotate_if_needed(self):
-        """按日期轮换日志文件"""
+        
         current = datetime.now().strftime("%Y%m%d")
         if current != self.current_date:
             self.current_date = current
@@ -345,7 +340,7 @@ class AuditLogger:
         request_id: Optional[str] = None,
         ip_address: Optional[str] = None
     ):
-        """记录审计日志"""
+       
         self._rotate_if_needed()
 
         log_file = self.audit_path / f"audit_{self.current_date}.jsonl"
@@ -367,7 +362,7 @@ class AuditLogger:
 
 
 class MetricsCollector:
-    """指标收集器"""
+   
 
     def __init__(self):
         self._counters: Dict[str, int] = defaultdict(int)
@@ -375,25 +370,25 @@ class MetricsCollector:
         self._gauges: Dict[str, float] = {}
 
     def increment(self, name: str, value: int = 1):
-        """递增计数器"""
+       
         self._counters[name] += value
 
     def record(self, name: str, value: float):
-        """记录直方图值"""
+       
         self._histograms[name].append(value)
         if len(self._histograms[name]) > 1000:
             self._histograms[name] = self._histograms[name][-1000:]
 
     def gauge(self, name: str, value: float):
-        """设置仪表值"""
+        
         self._gauges[name] = value
 
     def get_counter(self, name: str) -> int:
-        """获取计数器值"""
+     
         return self._counters.get(name, 0)
 
     def get_histogram_stats(self, name: str) -> Dict[str, float]:
-        """获取直方图统计"""
+        
         values = self._histograms.get(name, [])
         if not values:
             return {}
@@ -410,7 +405,7 @@ class MetricsCollector:
         }
 
     def get_all_metrics(self) -> Dict[str, Any]:
-        """获取所有指标"""
+     
         return {
             "counters": dict(self._counters),
             "gauges": dict(self._gauges),
@@ -423,13 +418,13 @@ class MetricsCollector:
 
 @lru_cache()
 def get_logger(name: str = "ml_pipeline") -> StructuredLogger:
-    """获取日志记录器单例"""
+   
     return StructuredLogger(name=name)
 
 
 @lru_cache()
 def get_audit_logger() -> AuditLogger:
-    """获取审计日志记录器单例"""
+  
     return AuditLogger()
 
 
