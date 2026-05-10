@@ -1,5 +1,5 @@
 # Production ML Pipeline with MLflow - Requirements
-# 生产级机器学习管道依赖
+
 
 # Core ML
 pandas>=2.0.0
