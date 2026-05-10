@@ -1,0 +1,274 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline-api
+  namespace: ml-pipeline-production
+  labels:
+    app: ml-pipeline-api
+    tier: backend
+    env: production
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ml-pipeline-api
+  template:
+    metadata:
+      labels:
+        app: ml-pipeline-api
+        tier: backend
+        env: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: ml-pipeline-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: ghcr.io/your-org/ml-pipeline-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: API_HOST
+              value: "0.0.0.0"
+            - name: API_PORT
+              value: "8080"
+            - name: DEBUG
+              value: "false"
+            - name: MLFLOW_TRACKING_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-pipeline-config
+                  key: mlflow_uri
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ml-pipeline-secrets
+                  key: database_url
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-pipeline-secrets
+                  key: api_key
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          volumeMounts:
+            - name: ml-artifacts
+              mountPath: /app/artifacts
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: ml-artifacts
+          persistentVolumeClaim:
+            claimName: ml-artifacts-pvc
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: ml-pipeline-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: ml-pipeline-api
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - ml-pipeline-api
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline-api
+  namespace: ml-pipeline-production
+  labels:
+    app: ml-pipeline-api
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: ml-pipeline-api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-pipeline-api
+  namespace: ml-pipeline-production
+  labels:
+    app: ml-pipeline-api
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - api.example.com
+      secretName: ml-pipeline-api-tls
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-pipeline-api
+                port:
+                  name: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ml-pipeline-api
+  namespace: ml-pipeline-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ml-pipeline-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-artifacts-pvc
+  namespace: ml-pipeline-production
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: standard-ssd
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-pipeline-config
+  namespace: ml-pipeline-production
+data:
+  mlflow_uri: "http://mlflow-service:5000"
+  log_level: "INFO"
+  max_batch_size: "1000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ml-pipeline-secrets
+  namespace: ml-pipeline-production
+type: Opaque
+stringData:
+  database_url: "postgresql://user:pass@db:5432/ml_pipeline"
+  api_key: "your-secure-api-key-here"
+  secret_key: "your-jwt-secret-key-here"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-pipeline-sa
+  namespace: ml-pipeline-production

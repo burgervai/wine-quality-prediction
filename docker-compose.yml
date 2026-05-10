@@ -1,0 +1,178 @@
+# Production ML Pipeline - Docker Compose
+# Local development and testing environment
+
+version: '3.8'
+
+services:
+  # MLflow Tracking Server
+  mlflow:
+    build:
+      context: .
+      target: mlflow-server
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_TRACKING_URI=postgresql://mlflow:mlflow@postgres:5432/mlflow
+      - MLFLOW_ARTIFACT_ROOT=s3://ml-pipeline-artifacts/
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - mlflow-data:/app/mlruns
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ml-pipeline-postgres
+    environment:
+      - POSTGRES_USER=mlflow
+      - POSTGRES_PASSWORD=mlflow
+      - POSTGRES_DB=mlflow
+      - POSTGRES_MULTIPLE_EXTENSIONS=pgcrypto
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: ml-pipeline-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # ML Pipeline API
+  api:
+    build:
+      context: .
+      target: production
+    container_name: ml-pipeline-api
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - DEBUG=false
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATABASE_URL=postgresql://mlflow:mlflow@postgres:5432/mlflow
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-here}
+      - API_KEY=${API_KEY:-production-api-key}
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./artifacts:/app/artifacts
+      - api-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # Redis for Rate Limiting
+  redis:
+    image: redis:7-alpine
+    container_name: ml-pipeline-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # Prometheus for Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ml-pipeline-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./k8s/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ml-pipeline-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - ml-pipeline-network
+    restart: unless-stopped
+
+volumes:
+  mlflow-data:
+  postgres-data:
+  minio-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  api-logs:
+
+networks:
+  ml-pipeline-network:
+    driver: bridge
