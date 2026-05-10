@@ -111,11 +111,11 @@ class DatabaseManager:
                 await conn.run_sync(Base.metadata.create_all)
 
             self._connected = True
-            logger.info("数据库连接初始化成功")
+            logger.info("")
             return True
 
         except Exception as e:
-            logger.error(f"数据库连接初始化失败: {str(e)}")
+            logger.error(f": {str(e)}")
             self._connected = False
             return False
 
@@ -123,7 +123,7 @@ class DatabaseManager:
         if self.engine:
             await self.engine.dispose()
             self._connected = False
-            logger.info("数据库连接已关闭")
+            logger.info("")
 
     def is_connected(self) -> bool:
         return self._connected
@@ -131,7 +131,7 @@ class DatabaseManager:
     @asynccontextmanager
     async def session(self):
         if not self._connected:
-            raise ConnectionError("数据库未连接")
+            raise ConnectionError("")
 
         session = self.async_session()
         try:
