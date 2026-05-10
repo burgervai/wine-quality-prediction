@@ -58,7 +58,7 @@ class ModelTrainerConfig:
 
 @dataclass
 class ModelEvaluationConfig:
-    """模型评估配置"""
+
     root_dir: str = "artifacts/model_evaluation"
     test_data_path: str = "artifacts/data_transformation/test.csv"
     model_path: str = "artifacts/model_trainer/model.joblib"
@@ -73,7 +73,7 @@ class ModelEvaluationConfig:
 
 @dataclass
 class APIConfig:
-    """API服务配置"""
+ 
     host: str = "0.0.0.0"
     port: int = 8080
     debug: bool = False
@@ -87,7 +87,7 @@ class APIConfig:
 
 @dataclass
 class LoggingConfig:
-    """日志配置"""
+
     level: str = "INFO"
     format: str = "[%(asctime)s: %(levelname)s: %(module)s: %(message)s]"
     log_dir: str = "logs"
@@ -100,7 +100,7 @@ class LoggingConfig:
 
 @dataclass
 class DatabaseConfig:
-    """数据库配置"""
+  
     host: str = "localhost"
     port: int = 5432
     database: str = "ml_pipeline"
@@ -114,7 +114,7 @@ class DatabaseConfig:
 
 @dataclass
 class MonitoringConfig:
-    """监控配置"""
+   
     enable_metrics: bool = True
     metrics_port: int = 9090
     health_check_path: str = "/health"
@@ -124,8 +124,7 @@ class MonitoringConfig:
 
 
 class ConfigManager:
-    """配置管理器 - 单例模式"""
-
+  
     _instance: Optional['ConfigManager'] = None
     _config_cache: Dict[str, Any] = {}
 
@@ -145,7 +144,7 @@ class ConfigManager:
         self._load_env_variables()
 
     def _load_env_variables(self) -> None:
-        """加载环境变量配置"""
+        
         if self._env_file.exists():
             with open(self._env_file, 'r') as f:
                 for line in f:
@@ -155,7 +154,7 @@ class ConfigManager:
                         os.environ[key.strip()] = value.strip()
 
     def load_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
-        """加载配置文件"""
+     
         if config_path:
             path = Path(config_path)
         else:
@@ -171,7 +170,7 @@ class ConfigManager:
         return config_data
 
     def get_data_ingestion_config(self) -> DataIngestionConfig:
-        """获取数据摄取配置"""
+        
         config = self._config_cache.get('data_ingestion', {})
         return DataIngestionConfig(
             root_dir=config.get('root_dir', 'artifacts/data_ingestion'),
@@ -183,7 +182,7 @@ class ConfigManager:
         )
 
     def get_data_validation_config(self) -> DataValidationConfig:
-        """获取数据验证配置"""
+      
         config = self._config_cache.get('data_validation', {})
         return DataValidationConfig(
             root_dir=config.get('root_dir', 'artifacts/data_validation'),
@@ -194,7 +193,7 @@ class ConfigManager:
         )
 
     def get_data_transformation_config(self) -> DataTransformationConfig:
-        """获取数据转换配置"""
+       
         config = self._config_cache.get('data_transformation', {})
         return DataTransformationConfig(
             root_dir=config.get('root_dir', 'artifacts/data_transformation'),
@@ -208,7 +207,7 @@ class ConfigManager:
         )
 
     def get_model_trainer_config(self) -> ModelTrainerConfig:
-        """获取模型训练配置"""
+        
         config = self._config_cache.get('model_trainer', {})
         return ModelTrainerConfig(
             root_dir=config.get('root_dir', 'artifacts/model_trainer'),
@@ -226,7 +225,7 @@ class ConfigManager:
         )
 
     def get_model_evaluation_config(self) -> ModelEvaluationConfig:
-        """获取模型评估配置"""
+        
         config = self._config_cache.get('model_evaluation', {})
         return ModelEvaluationConfig(
             root_dir=config.get('root_dir', 'artifacts/model_evaluation'),
@@ -242,7 +241,7 @@ class ConfigManager:
         )
 
     def get_api_config(self) -> APIConfig:
-        """获取API配置"""
+       
         return APIConfig(
             host=os.environ.get('API_HOST', '0.0.0.0'),
             port=int(os.environ.get('API_PORT', '8080')),
@@ -256,7 +255,7 @@ class ConfigManager:
         )
 
     def get_logging_config(self) -> LoggingConfig:
-        """获取日志配置"""
+      
         config = self._config_cache.get('logging', {})
         return LoggingConfig(
             level=config.get('level', 'INFO'),
@@ -270,7 +269,7 @@ class ConfigManager:
         )
 
     def get_database_config(self) -> DatabaseConfig:
-        """获取数据库配置"""
+       
         return DatabaseConfig(
             host=os.environ.get('DB_HOST', 'localhost'),
             port=int(os.environ.get('DB_PORT', '5432')),
@@ -284,7 +283,7 @@ class ConfigManager:
         )
 
     def get_monitoring_config(self) -> MonitoringConfig:
-        """获取监控配置"""
+        
         config = self._config_cache.get('monitoring', {})
         return MonitoringConfig(
             enable_metrics=config.get('enable_metrics', True),
@@ -297,8 +296,7 @@ class ConfigManager:
 
 
 @lru_cache()
-def get_config_manager() -> ConfigManager:
-    """获取配置管理器单例"""
+
     manager = ConfigManager()
     manager.load_config()
     return manager
